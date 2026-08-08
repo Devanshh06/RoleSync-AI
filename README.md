@@ -1,5 +1,3 @@
-Here is the updated GitHub repository description with the new name, **RoleSync**.
-
 # RoleSync 🎓🤖
 
 **An AI-powered institutional knowledge management system ensuring seamless faculty handovers and uninterrupted academic operations.**
