@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { GraduationCap, Mail, Lock, Loader2, Eye, EyeOff, ArrowRight } from 'lucide-react';
 
@@ -184,7 +184,17 @@ const LoginPage = () => {
           </div>
         </div>
 
-        <p className="text-center text-xs text-slate-600 mt-8">
+        {/* Register link */}
+        <div className="mt-5 text-center">
+          <p className="text-sm text-slate-400">
+            Don&apos;t have an account?{' '}
+            <Link to="/register" className="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
+              Create an account
+            </Link>
+          </p>
+        </div>
+
+        <p className="text-center text-xs text-slate-600 mt-6">
           © 2026 RoleSync AI · Institutional Continuity Platform
         </p>
       </div>

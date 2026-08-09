@@ -1,0 +1,215 @@
+# Supabase Integration + Registration & Task Management
+
+Add Supabase as the database layer, create a staff registration page, and build a full task management system where staff can view responsibilities and add/manage tasks with rich metadata.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Supabase Credentials**: You'll need to provide your Supabase project URL and anon key. I'll create a `.env` file placeholder — you'll fill in the actual values.
+
+> [!IMPORTANT]
+> **Storage Bucket**: The task system includes document upload. You'll need to create a Supabase storage bucket named `task-documents` in your Supabase dashboard with appropriate policies.
+
+> [!WARNING]
+> **Auth Strategy**: Since you mentioned you'll handle the backend processing yourself, I'll set up Supabase client-side auth (email/password) for registration/login but wire it so you can easily swap to your own auth. The registration page will collect staff details and insert into a `staff` table. You'll connect the actual Supabase auth flow later.
+
+## Open Questions
+
+> [!IMPORTANT]
+> **Task Categories**: I've planned these responsibility categories based on your description. Should I add/remove any?
+> - Subject Teaching
+> - Practical Teaching  
+> - Program Coordinating
+> - Seminar Responsibility
+> - Internship Responsibility
+> - Scholarship Responsibility
+> - Examination Duty
+> - Research/Project Guidance
+> - Other
+
+> [!NOTE]
+> **Multi-coordinator**: You mentioned "any more coordinator" — I'll implement this as a multi-select of existing staff members who are co-coordinators for a task.
+
+---
+
+## Proposed Changes
+
+### Supabase Setup & Database Schema
+
+#### [NEW] [supabaseClient.js](file:///e:/Projects/RoleSync-AI/client/src/lib/supabaseClient.js)
+- Initialize Supabase client with env variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`)
+- Export the client for use across the app
+
+#### [NEW] [.env.example](file:///e:/Projects/RoleSync-AI/client/.env.example)
+- Template with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` placeholders
+
+#### [NEW] [supabase_setup.sql](file:///e:/Projects/RoleSync-AI/supabase_setup.sql)
+SQL file to run in Supabase SQL Editor containing:
+
+**`staff` table:**
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid (PK) | Default `gen_random_uuid()` |
+| `full_name` | text | NOT NULL |
+| `email` | text | UNIQUE, NOT NULL |
+| `password_hash` | text | For your backend auth — stores hashed password |
+| `department` | text | e.g. "Computer Science" |
+| `designation` | text | e.g. "Assistant Professor" |
+| `contact` | text | Phone number |
+| `user_type` | text | 'Admin' or 'Faculty' (default 'Faculty') |
+| `status` | text | 'Active', 'Leaving', 'Exited' (default 'Active') |
+| `avatar_url` | text | Optional profile picture |
+| `created_at` | timestamptz | Default `now()` |
+
+**`task_categories` table:**
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid (PK) | Default `gen_random_uuid()` |
+| `name` | text | UNIQUE, NOT NULL |
+| `icon` | text | Icon identifier |
+| `color` | text | Hex color for UI |
+
+Pre-seeded with: Subject Teaching, Practical Teaching, Program Coordinating, Seminar Responsibility, Internship Responsibility, Scholarship Responsibility, Examination Duty, Research/Project Guidance, Other
+
+**`tasks` table:**
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid (PK) | Default `gen_random_uuid()` |
+| `title` | text | NOT NULL |
+| `description` | text | Detailed notes |
+| `category_id` | uuid (FK) | → `task_categories.id` |
+| `assigned_to` | uuid (FK) | → `staff.id` (primary owner) |
+| `created_by` | uuid (FK) | → `staff.id` |
+| `status` | text | 'Not Started', 'In Progress', 'Done', 'Overdue' |
+| `priority` | text | 'Low', 'Medium', 'High', 'Urgent' |
+| `date_assigned` | date | When the task was assigned |
+| `deadline` | date | Due date |
+| `notes` | text | Additional notes |
+| `document_url` | text | Supabase storage URL for uploaded file |
+| `document_name` | text | Original filename |
+| `created_at` | timestamptz | Default `now()` |
+| `updated_at` | timestamptz | Default `now()` |
+
+**`task_coordinators` table** (many-to-many for co-coordinators):
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid (PK) | Default `gen_random_uuid()` |
+| `task_id` | uuid (FK) | → `tasks.id` ON DELETE CASCADE |
+| `staff_id` | uuid (FK) | → `staff.id` ON DELETE CASCADE |
+| UNIQUE | | `(task_id, staff_id)` |
+
+Plus **Row Level Security (RLS)** policies and an **`updated_at` trigger**.
+
+---
+
+### Supabase Service Layer
+
+#### [NEW] [taskService.js](file:///e:/Projects/RoleSync-AI/client/src/services/taskService.js)
+Functions for CRUD operations:
+- `fetchTasks(staffId)` — Get all tasks assigned to a staff member
+- `fetchTasksByCategory(staffId, categoryId)` — Filter by category
+- `createTask(taskData)` — Insert a new task with all fields
+- `updateTask(taskId, updates)` — Update task status/details
+- `deleteTask(taskId)` — Remove a task
+- `addCoordinators(taskId, staffIds)` — Add co-coordinators
+- `uploadDocument(file)` — Upload to Supabase storage, return URL
+- `fetchCategories()` — Get all task categories
+- `fetchAllStaff()` — For co-coordinator selection dropdown
+
+#### [NEW] [staffService.js](file:///e:/Projects/RoleSync-AI/client/src/services/staffService.js)
+- `registerStaff(data)` — Insert into `staff` table
+- `getStaffByEmail(email)` — Lookup for login
+- `fetchAllStaff()` — List all staff (for coordinator picker)
+
+---
+
+### Registration Page
+
+#### [NEW] [RegisterPage.jsx](file:///e:/Projects/RoleSync-AI/client/src/pages/RegisterPage.jsx)
+Premium dark-themed registration page (matching login page aesthetics):
+- **Fields**: Full Name, Email, Password, Confirm Password, Department (dropdown), Designation, Contact
+- **Validation**: Real-time field validation, email format check, password match
+- Animated gradient background matching login page
+- Glassmorphism card design
+- Link to login page ("Already have an account?")
+- Inserts into `staff` table on submit
+- Success animation + redirect to login
+
+---
+
+### Task Management Page
+
+#### [NEW] [TasksPage.jsx](file:///e:/Projects/RoleSync-AI/client/src/pages/TasksPage.jsx)
+Full task management dashboard with:
+- **Header**: Page title with task stats (total, pending, completed, overdue)
+- **Category Filter Bar**: Horizontal scrollable pills for each responsibility type (Subject Teaching, Practical, Seminar, etc.) with active highlighting
+- **Task Grid/List**: Cards showing each task with:
+  - Title, category badge, priority indicator
+  - Deadline with color-coded urgency (green/amber/red)
+  - Co-coordinators avatars
+  - Status badge
+  - Document attachment indicator
+- **"Add Task" Button**: Opens a rich modal form
+- **Empty states** per category with illustration
+
+#### [NEW] [AddTaskModal.jsx](file:///e:/Projects/RoleSync-AI/client/src/components/AddTaskModal.jsx)
+Modal form for creating a new task:
+- **Title** (text input)
+- **Category** (dropdown — from `task_categories`)
+- **Description** (textarea)
+- **Date Assigned** (date picker, defaults to today)
+- **Deadline** (date picker)
+- **Priority** (select: Low/Medium/High/Urgent)
+- **Co-Coordinators** (multi-select searchable dropdown of staff)
+- **Document Upload** (drag-and-drop file zone)
+- **Notes** (textarea)
+- Animated transitions, form validation
+- Uploads document to Supabase Storage, then saves task to DB
+
+#### [NEW] [TaskCard.jsx](file:///e:/Projects/RoleSync-AI/client/src/components/TaskCard.jsx)
+Reusable task card component:
+- Glassmorphism styling matching the app
+- Category color-coded left border
+- Priority dot indicator
+- Deadline countdown (e.g. "3 days left", "Overdue!")
+- Expandable to see full details
+- Edit/Delete action buttons
+
+---
+
+### Routing & Navigation Updates
+
+#### [MODIFY] [App.jsx](file:///e:/Projects/RoleSync-AI/client/src/App.jsx)
+- Add `/register` public route → `RegisterPage`
+- Add `/tasks` protected route → `TasksPage`
+
+#### [MODIFY] [Sidebar.jsx](file:///e:/Projects/RoleSync-AI/client/src/components/Sidebar.jsx)
+- Add "My Tasks" nav item under a new "Tasks" group with `ClipboardList` icon
+- Link to `/tasks`
+
+#### [MODIFY] [LoginPage.jsx](file:///e:/Projects/RoleSync-AI/client/src/pages/LoginPage.jsx)
+- Add "Create an account" link pointing to `/register`
+
+---
+
+### Dependencies
+
+#### [MODIFY] [package.json](file:///e:/Projects/RoleSync-AI/client/package.json)
+- Add `@supabase/supabase-js` dependency
+
+---
+
+## Verification Plan
+
+### Manual Verification
+- Run `npm run dev` and verify:
+  1. Registration page loads at `/register` with all form fields, matches the dark premium aesthetic of login
+  2. Registration form validates inputs and inserts into Supabase `staff` table
+  3. Login page has a "Create account" link
+  4. After login, "My Tasks" appears in sidebar
+  5. Tasks page loads with category filter bar, empty states
+  6. "Add Task" modal opens with all fields (title, category, date, deadline, priority, coordinators, document upload, notes)
+  7. Task creation saves to Supabase `tasks` table
+  8. Tasks display in card grid with proper styling
+  9. Document upload works via Supabase Storage
+  10. SQL file can be executed in Supabase SQL Editor without errors

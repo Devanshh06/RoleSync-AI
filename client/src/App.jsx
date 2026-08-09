@@ -9,6 +9,7 @@ import './App.css';
 
 // Pages
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import HandoverPage from './pages/HandoverPage';
 import AIBriefPage from './pages/AIBriefPage';
@@ -17,6 +18,7 @@ import AdminDashboardPage from './pages/AdminDashboardPage';
 import FacultyListPage from './pages/FacultyListPage';
 import FacultyProfilePage from './pages/FacultyProfilePage';
 import RoleDirectoryPage from './pages/RoleDirectoryPage';
+import TasksPage from './pages/TasksPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import NotFoundPage from './pages/NotFoundPage';
 
@@ -47,6 +49,7 @@ function App() {
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
 
             {/* Protected routes — any authenticated user */}
             <Route element={<ProtectedRoute />}>
@@ -56,6 +59,7 @@ function App() {
                 <Route path="/handover" element={<HandoverPage />} />
                 <Route path="/ai-brief" element={<AIBriefPage />} />
                 <Route path="/search" element={<SearchPage />} />
+                <Route path="/tasks" element={<TasksPage />} />
                 <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
                 {/* Admin-only routes */}
