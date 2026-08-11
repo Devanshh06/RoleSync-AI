@@ -22,6 +22,30 @@ const DEPARTMENTS = [
   'Other',
 ];
 
+// Input wrapper with icon — defined outside RegisterPage to avoid
+// re-creating the component on every render (which causes focus loss).
+const InputField = ({ icon: Icon, id, label, type = 'text', value, onChange, placeholder, error: fieldErr, children }) => (
+  <div>
+    <label className="block text-sm font-medium text-slate-300 mb-2">{label}</label>
+    <div className="relative">
+      <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+      {children || (
+        <input
+          id={id}
+          type={type}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          className={`w-full pl-10 pr-4 py-3 bg-white/5 border ${
+            fieldErr ? 'border-red-400/50 ring-1 ring-red-400/30' : 'border-white/10'
+          } rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
+        />
+      )}
+    </div>
+    {fieldErr && <p className="text-xs text-red-400 mt-1">{fieldErr}</p>}
+  </div>
+);
+
 const RegisterPage = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1); // 1 = form, 2 = success
@@ -90,29 +114,6 @@ const RegisterPage = () => {
       setLoading(false);
     }
   };
-
-  // Input wrapper with icon
-  const InputField = ({ icon: Icon, id, label, type = 'text', value, onChange, placeholder, error: fieldErr, children }) => (
-    <div>
-      <label className="block text-sm font-medium text-slate-300 mb-2">{label}</label>
-      <div className="relative">
-        <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-        {children || (
-          <input
-            id={id}
-            type={type}
-            value={value}
-            onChange={onChange}
-            placeholder={placeholder}
-            className={`w-full pl-10 pr-4 py-3 bg-white/5 border ${
-              fieldErr ? 'border-red-400/50 ring-1 ring-red-400/30' : 'border-white/10'
-            } rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
-          />
-        )}
-      </div>
-      {fieldErr && <p className="text-xs text-red-400 mt-1">{fieldErr}</p>}
-    </div>
-  );
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">

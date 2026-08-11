@@ -48,8 +48,21 @@ export async function getStaffByEmail(email) {
 export async function fetchAllStaff() {
   const { data, error } = await supabase
     .from('staff')
-    .select('id, full_name, email, department, designation, avatar_url')
+    .select('id, full_name, email, department, designation, avatar_url, status')
     .eq('status', 'Active')
+    .order('full_name', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Fetch all staff members for the directory, regardless of status.
+ */
+export async function getDirectoryStaff() {
+  const { data, error } = await supabase
+    .from('staff')
+    .select('id, full_name, email, department, designation, avatar_url, status')
     .order('full_name', { ascending: true });
 
   if (error) throw error;

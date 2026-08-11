@@ -15,6 +15,9 @@ export async function fetchCategories() {
   return data || [];
 }
 
+// ─── Utility ─────────────────────────────────────────────────
+const isValidUUID = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
 // ─── Tasks CRUD ────────────────────────────────────────────
 
 /**
@@ -22,6 +25,8 @@ export async function fetchCategories() {
  * joined with category and co-coordinators.
  */
 export async function fetchTasks(staffId) {
+  if (!isValidUUID(staffId)) return []; // Prevent error with mock demo users (u1, u2)
+
   const { data, error } = await supabase
     .from('tasks')
     .select(`
@@ -39,9 +44,30 @@ export async function fetchTasks(staffId) {
 }
 
 /**
+ * Fetch tasks for a predecessor (someone who is handing over)
+ */
+export async function fetchPredecessorTasks(predecessorId) {
+  if (!isValidUUID(predecessorId)) return [];
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .select(`
+      *,
+      category:task_categories(*)
+    `)
+    .eq('assigned_to', predecessorId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+/**
  * Fetch tasks filtered by category.
  */
 export async function fetchTasksByCategory(staffId, categoryId) {
+  if (!isValidUUID(staffId)) return [];
+
   const { data, error } = await supabase
     .from('tasks')
     .select(`

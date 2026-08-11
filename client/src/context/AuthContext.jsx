@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { login as apiLogin, getMe } from '../api/authApi';
+import { getStaffByEmail } from '../services/staffService';
 
 const AuthContext = createContext(null);
 
 // Mock user data for development without backend
 const MOCK_USERS = {
   'admin@rolesync.edu': {
-    id: 'u1',
+    id: '00000000-0000-0000-0000-000000000001',
     name: 'Dr. Raghav Mehta',
     email: 'admin@rolesync.edu',
     department: 'Computer Science',
@@ -16,7 +17,7 @@ const MOCK_USERS = {
     userType: 'Admin',
   },
   'faculty@rolesync.edu': {
-    id: 'u2',
+    id: '00000000-0000-0000-0000-000000000002',
     name: 'Devansh Sharma',
     email: 'faculty@rolesync.edu',
     department: 'Computer Science',
@@ -52,9 +53,14 @@ export const AuthProvider = ({ children }) => {
         const savedUser = localStorage.getItem('rolesync_user');
         if (savedUser) {
           try {
-            setUser(JSON.parse(savedUser));
+            const parsedUser = JSON.parse(savedUser);
+            // Force clear if they have the old non-UUID mock ids
+            if (parsedUser.id === 'u1' || parsedUser.id === 'u2') {
+              throw new Error('Old mock session format');
+            }
+            setUser(parsedUser);
           } catch {
-            // Corrupted data — clear everything
+            // Corrupted data or old format — clear everything
             localStorage.removeItem('rolesync_token');
             localStorage.removeItem('rolesync_user');
             setToken(null);
@@ -83,6 +89,33 @@ export const AuthProvider = ({ children }) => {
       setUser(userData);
       return { success: true };
     } catch (apiError) {
+      // API failed — try Supabase staff table lookup
+      try {
+        const staffRow = await getStaffByEmail(email);
+        // Compare password (plain-text for now; TODO: hash server-side)
+        if (staffRow && staffRow.password_hash === password) {
+          const userData = {
+            id: staffRow.id,
+            name: staffRow.full_name,
+            email: staffRow.email,
+            department: staffRow.department,
+            designation: staffRow.designation,
+            contact: staffRow.contact,
+            status: staffRow.status,
+            userType: staffRow.user_type,
+            avatarUrl: staffRow.avatar_url,
+          };
+          const supaToken = 'supabase_session_' + Date.now();
+          localStorage.setItem('rolesync_token', supaToken);
+          localStorage.setItem('rolesync_user', JSON.stringify(userData));
+          setToken(supaToken);
+          setUser(userData);
+          return { success: true };
+        }
+      } catch {
+        // Supabase lookup failed — continue to mock fallback
+      }
+
       // Fallback to mock auth for development
       const mockUser = MOCK_USERS[email];
       if (mockUser && password === 'password123') {
@@ -94,15 +127,8 @@ export const AuthProvider = ({ children }) => {
         return { success: true };
       }
 
-      // Determine error message
-      if (apiError.response?.status === 401) {
-        return { success: false, error: 'Invalid email or password.' };
-      }
-      if (apiError.code === 'ERR_NETWORK') {
-        // No backend — mock auth failed too
-        return { success: false, error: 'Invalid credentials. Try admin@rolesync.edu / password123' };
-      }
-      return { success: false, error: apiError.response?.data?.message || 'Login failed. Please try again.' };
+      // Nothing matched
+      return { success: false, error: 'Invalid email or password.' };
     }
   }, []);
 

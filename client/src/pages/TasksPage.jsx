@@ -57,7 +57,7 @@ const TasksPage = () => {
       }
     } catch (err) {
       console.error('Failed to load data:', err);
-      setError('Failed to load data. Please check your Supabase connection.');
+      setError('Connection Error: ' + (err.message || err.error_description || 'Check console for details'));
       // Set empty arrays as fallback
       setCategories([]);
       setStaffList([]);

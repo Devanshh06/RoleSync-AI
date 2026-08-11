@@ -1,44 +1,94 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserCog, Search, Filter, Plus, AlertTriangle, ChevronRight, Mail, Phone } from 'lucide-react';
+import { UserCog, Search, Filter, Plus, AlertTriangle, ChevronRight, Mail, Phone, LockKeyhole } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
 import EmptyState from '../components/ui/EmptyState';
-
-// Mock faculty data
-const MOCK_FACULTY = [
-  { id: 'u1', name: 'Dr. Raghav Mehta', email: 'raghav@rolesync.edu', department: 'Computer Science', designation: 'HOD', status: 'Active', contact: '+91-9876543210', roles: ['Head of Department'] },
-  { id: 'u2', name: 'Devansh Sharma', email: 'devansh@rolesync.edu', department: 'Computer Science', designation: 'Asst. Professor', status: 'Leaving', contact: '+91-9876543211', roles: ['Internship Coordinator', 'Lab Administrator'] },
-  { id: 'u3', name: 'Prof. Anita Desai', email: 'anita@rolesync.edu', department: 'Computer Science', designation: 'Assoc. Professor', status: 'Active', contact: '+91-9876543212', roles: ['Exam Controller'] },
-  { id: 'u4', name: 'Dr. Vikram Singh', email: 'vikram@rolesync.edu', department: 'Mechanical', designation: 'Professor', status: 'Active', contact: '+91-9876543213', roles: ['Workshop Coordinator'] },
-  { id: 'u5', name: 'Dr. Priya Nair', email: 'priya@rolesync.edu', department: 'Electronics', designation: 'Asst. Professor', status: 'Exited', contact: '+91-9876543214', roles: [] },
-];
+import { getDirectoryStaff, updateStaffProfile } from '../services/staffService';
+import { requestAccess, fetchMyHandovers } from '../services/handoverService';
+import { useAuth } from '../context/AuthContext';
 
 const FacultyListPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  
+  const [faculty, setFaculty] = useState([]);
+  const [myHandovers, setMyHandovers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [deptFilter, setDeptFilter] = useState('All');
+  
   const [confirmLeaving, setConfirmLeaving] = useState(null);
-  const [faculty, setFaculty] = useState(MOCK_FACULTY);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const departments = ['All', ...new Set(MOCK_FACULTY.map((f) => f.department))];
+  useEffect(() => {
+    loadData();
+  }, [user]);
+
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const [staffData, handoversData] = await Promise.all([
+        getDirectoryStaff(),
+        user?.id ? fetchMyHandovers(user.id) : Promise.resolve([])
+      ]);
+      setFaculty(staffData);
+      setMyHandovers(handoversData);
+    } catch (err) {
+      console.error('Failed to load faculty:', err);
+      setError('Failed to load directory. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const departments = ['All', ...new Set(faculty.map((f) => f.department).filter(Boolean))];
   const statuses = ['All', 'Active', 'Leaving', 'Exited'];
 
   const filtered = faculty.filter((f) => {
-    const matchesSearch = f.name.toLowerCase().includes(searchQuery.toLowerCase()) || f.email.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = f.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) || f.email?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'All' || f.status === statusFilter;
     const matchesDept = deptFilter === 'All' || f.department === deptFilter;
     return matchesSearch && matchesStatus && matchesDept;
   });
 
-  const handleMarkLeaving = (facultyMember) => {
-    setFaculty((prev) =>
-      prev.map((f) => (f.id === facultyMember.id ? { ...f, status: 'Leaving' } : f))
-    );
-    setConfirmLeaving(null);
+  const handleMarkLeaving = async (facultyMember) => {
+    setIsProcessing(true);
+    try {
+      await updateStaffProfile(facultyMember.id, { status: 'Leaving' });
+      await loadData();
+      setConfirmLeaving(null);
+    } catch (err) {
+      alert('Failed to mark as leaving: ' + err.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRequestAccess = async (e, predecessorId) => {
+    e.stopPropagation();
+    if (!user?.id) return alert('Please log in first.');
+    
+    setIsProcessing(true);
+    try {
+      await requestAccess(predecessorId, user.id);
+      await loadData();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Helper to check if we already requested access
+  const getHandoverStatus = (predId) => {
+    const req = myHandovers.find(h => h.predecessor_id === predId && h.successor_id === user?.id);
+    return req ? req.status : null;
   };
 
   return (
@@ -48,14 +98,17 @@ const FacultyListPage = () => {
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-3">
             <UserCog className="text-blue-500" />
-            Faculty Management
+            Faculty Directory
           </h1>
-          <p className="text-slate-500 dark:text-slate-400">Manage faculty profiles, track statuses, and initiate handovers.</p>
+          <p className="text-slate-500 dark:text-slate-400">Manage faculty profiles and request handover access.</p>
         </div>
-        <Button variant="primary" icon={Plus}>
-          Add Faculty
-        </Button>
       </div>
+
+      {error && (
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-6 border border-red-100">
+          {error}
+        </div>
+      )}
 
       {/* Filters */}
       <Card hover={false} padding="p-4" className="mb-6">
@@ -102,7 +155,9 @@ const FacultyListPage = () => {
       </div>
 
       {/* Faculty Table */}
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <div className="text-center p-12 text-slate-500">Loading directory...</div>
+      ) : filtered.length === 0 ? (
         <Card hover={false}>
           <EmptyState
             icon={UserCog}
@@ -118,68 +173,80 @@ const FacultyListPage = () => {
                 <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
                   <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Faculty</th>
                   <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Department</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Roles</th>
                   <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Handover Access</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Admin</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((f) => (
-                  <tr
-                    key={f.id}
-                    className="border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors cursor-pointer group"
-                    onClick={() => navigate(`/faculty/${f.id}`)}
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
-                          {f.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-                        </div>
-                        <div>
-                          <div className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                            {f.name}
+                {filtered.map((f) => {
+                  const reqStatus = getHandoverStatus(f.id);
+                  const isMe = f.id === user?.id;
+                  
+                  return (
+                    <tr
+                      key={f.id}
+                      className="border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                            {f.full_name?.split(' ').map((n) => n[0]).join('').slice(0, 2)}
                           </div>
-                          <div className="text-xs text-slate-500 flex items-center gap-1">
-                            <Mail className="w-3 h-3" /> {f.email}
+                          <div>
+                            <div className="font-semibold text-slate-800 dark:text-slate-200">
+                              {f.full_name} {isMe && <span className="text-xs text-blue-500 ml-1">(You)</span>}
+                            </div>
+                            <div className="text-xs text-slate-500 flex items-center gap-1">
+                              <Mail className="w-3 h-3" /> {f.email}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-slate-700 dark:text-slate-300">{f.department}</div>
-                      <div className="text-xs text-slate-500">{f.designation}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {f.roles.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {f.roles.map((r) => (
-                            <span key={r} className="text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-md font-medium">
-                              {r}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-slate-700 dark:text-slate-300">{f.department}</div>
+                        <div className="text-xs text-slate-500">{f.designation}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <StatusBadge status={f.status} />
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        {!isMe && f.status === 'Leaving' && (
+                          reqStatus ? (
+                            <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                              reqStatus === 'Approved' ? 'bg-green-100 text-green-700' :
+                              reqStatus === 'Rejected' ? 'bg-red-100 text-red-700' :
+                              'bg-amber-100 text-amber-700'
+                            }`}>
+                              {reqStatus}
                             </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400 italic">No active roles</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge status={f.status} />
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                        {f.status === 'Active' && (
-                          <button
-                            onClick={() => setConfirmLeaving(f)}
-                            className="text-xs font-medium text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 px-3 py-1.5 rounded-lg transition-colors"
-                          >
-                            Mark Leaving
-                          </button>
+                          ) : (
+                            <button
+                              onClick={(e) => handleRequestAccess(e, f.id)}
+                              disabled={isProcessing}
+                              className="text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 px-3 py-1.5 rounded-lg flex items-center justify-end gap-1 ml-auto transition-colors"
+                            >
+                              <LockKeyhole className="w-3 h-3" />
+                              Request Access
+                            </button>
+                          )
                         )}
-                        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors" />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                          {f.status === 'Active' && !isMe && (
+                            <button
+                              onClick={() => setConfirmLeaving(f)}
+                              className="text-xs font-medium text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                              Mark Leaving
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -194,8 +261,8 @@ const FacultyListPage = () => {
         size="sm"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setConfirmLeaving(null)}>Cancel</Button>
-            <Button variant="danger" icon={AlertTriangle} onClick={() => handleMarkLeaving(confirmLeaving)}>
+            <Button variant="secondary" onClick={() => setConfirmLeaving(null)} disabled={isProcessing}>Cancel</Button>
+            <Button variant="danger" icon={AlertTriangle} onClick={() => handleMarkLeaving(confirmLeaving)} disabled={isProcessing}>
               Confirm
             </Button>
           </>
@@ -203,13 +270,13 @@ const FacultyListPage = () => {
       >
         <div className="space-y-4">
           <p className="text-slate-600 dark:text-slate-400">
-            Are you sure you want to mark <span className="font-bold text-slate-800 dark:text-slate-200">{confirmLeaving?.name}</span> as leaving?
+            Are you sure you want to mark <span className="font-bold text-slate-800 dark:text-slate-200">{confirmLeaving?.full_name}</span> as leaving?
           </p>
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 text-sm text-amber-800 dark:text-amber-300">
             <div className="flex gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <div>
-                This will trigger the handover workflow for all roles held by this faculty member. Their tasks will be flagged for reassignment.
+                This will allow other staff members to request handover access to their tasks and documents.
               </div>
             </div>
           </div>
