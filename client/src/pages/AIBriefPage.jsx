@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
-import { generateAIBrief } from '../services/mockApi';
+import { generateAIBrief } from '../services/taskService';
+import { useAuth } from '../context/AuthContext';
 import { Sparkles, FileText, Download, Users, Clock, ListChecks, ArrowRight, RefreshCw } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 
 const AIBriefPage = () => {
+  const { user } = useAuth();
   const [brief, setBrief] = useState(null);
   const [loading, setLoading] = useState(false);
   const [parsedBrief, setParsedBrief] = useState(null);
 
   const handleGenerate = async () => {
+    if (!user?.id) return;
     setLoading(true);
-    const data = await generateAIBrief('role-123');
+    const data = await generateAIBrief(user.id);
     setBrief(data);
 
     // Parse mock brief into structured sections

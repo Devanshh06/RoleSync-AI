@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { searchRAGDocuments } from '../services/mockApi';
+import { searchRAGDocuments } from '../services/taskService';
 import { Search, BrainCircuit, ExternalLink, FileText, Users, ListTodo } from 'lucide-react';
 import Card from '../components/ui/Card';
 import StatusBadge from '../components/ui/StatusBadge';

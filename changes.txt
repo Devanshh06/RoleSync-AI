@@ -1,0 +1,16 @@
+1. The project is going a bit off track , like this is only being an handover 
+system , i dont want that , this project should be a faculty work manager system type. like faculty can write there task , ai agent automatically fetches tasks and updates it , also faculty can get reminders about the task . With that faculty can track their work , see summary in a timeline chart , with upcoming tasks or events.
+Along with that HOD can assign the task to the faculty , when HOD assigns it , the Taks appears on the faculty dashboard with a note that HOD assigned this. 
+
+2. The Handover System: So when a staff changes, like a staff was teaching DSA , then next sem the Staff changes, so they should understand all the context of DSA previous faculty, The new faculty only can request the current faculty for accessing the list of tasks, documents, events, and other activities carried out by the current staff. Upon Requesting the new staff can get all the access to the current staff resource , with that the AI briefer can also get all the access and context of the Data.
+
+3. Make it responsive for mobile View
+
+4. Improve UI Add animation , proper nav bar , loading screen 
+
+5. HOD can assign task to any faculty with document , also add a common vault of document , where anyone can upload a document for task for everyone, so that agent will automatically add that task to every staff or mentioned staff.
+
+6. The AI-Agent: Agent will be able to read email of staff by using Gmail app key. then it will add task or events into the respective faculty schedule. Also it will read all the document uploaded by faculty or HOD and update the schedule according and add tasks . Also it will maintain a context of all the progress , so that anyone can chat and ask anything. 
+
+7. User profile , settings , Export Task list, Notification system, Faculty dashboard, HOD dashboard, admin dashboard.
+

@@ -38,7 +38,7 @@ build/
 
 # IDEs / Agents
 .gemini/
-.agents/
 
 # Testing
 coverage/
+

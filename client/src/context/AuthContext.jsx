@@ -4,29 +4,7 @@ import { getStaffByEmail } from '../services/staffService';
 
 const AuthContext = createContext(null);
 
-// Mock user data for development without backend
-const MOCK_USERS = {
-  'admin@rolesync.edu': {
-    id: '00000000-0000-0000-0000-000000000001',
-    name: 'Dr. Raghav Mehta',
-    email: 'admin@rolesync.edu',
-    department: 'Computer Science',
-    designation: 'Head of Department',
-    contact: '+91-9876543210',
-    status: 'Active',
-    userType: 'Admin',
-  },
-  'faculty@rolesync.edu': {
-    id: '00000000-0000-0000-0000-000000000002',
-    name: 'Devansh Sharma',
-    email: 'faculty@rolesync.edu',
-    department: 'Computer Science',
-    designation: 'Assistant Professor',
-    contact: '+91-9876543211',
-    status: 'Leaving',
-    userType: 'Faculty',
-  },
-};
+// Mock user data removed to enforce real authentication
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -112,19 +90,9 @@ export const AuthProvider = ({ children }) => {
           setUser(userData);
           return { success: true };
         }
-      } catch {
-        // Supabase lookup failed — continue to mock fallback
-      }
-
-      // Fallback to mock auth for development
-      const mockUser = MOCK_USERS[email];
-      if (mockUser && password === 'password123') {
-        const mockToken = 'mock_jwt_' + Date.now();
-        localStorage.setItem('rolesync_token', mockToken);
-        localStorage.setItem('rolesync_user', JSON.stringify(mockUser));
-        setToken(mockToken);
-        setUser(mockUser);
-        return { success: true };
+      } catch (err) {
+        // Supabase lookup failed
+        console.error('Login error:', err);
       }
 
       // Nothing matched

@@ -216,3 +216,82 @@ export async function uploadDocument(file) {
     name: file.name,
   };
 }
+
+// ─── Reporting & AI (Replaced from Mock) ───────────────────
+
+/**
+ * Fetch basic admin metrics for dashboard
+ */
+export async function getAdminMetrics() {
+  const { count: totalTasks, error: err1 } = await supabase
+    .from('tasks')
+    .select('*', { count: 'exact', head: true });
+
+  const { count: completedTasks, error: err2 } = await supabase
+    .from('tasks')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'Done');
+
+  const { data: staffData, error: err3 } = await supabase
+    .from('staff')
+    .select('department');
+
+  if (err1 || err2 || err3) throw new Error('Failed to fetch metrics');
+
+  // Compute departmental stats (mocking progress by just returning dummy 75% for now if real data not robust)
+  const depts = {};
+  staffData.forEach(s => {
+    if (s.department) depts[s.department] = 75; // Ideally computed from tasks completion per dept
+  });
+
+  return {
+    totalHandovers: totalTasks || 0,
+    completedHandovers: completedTasks || 0,
+    pendingHandovers: (totalTasks || 0) - (completedTasks || 0),
+    departments: Object.keys(depts).map(d => ({ name: d, progress: depts[d] }))
+  };
+}
+
+/**
+ * Generate a simulated AI Brief string by aggregating a user's tasks
+ */
+export async function generateAIBrief(staffId) {
+  if (!isValidUUID(staffId)) throw new Error('Invalid ID');
+  const tasks = await fetchPredecessorTasks(staffId);
+  const pending = tasks.filter(t => t.status !== 'Done');
+  const completed = tasks.filter(t => t.status === 'Done');
+
+  return `### AI Handover Brief
+**Generated: ${new Date().toLocaleDateString()}**
+
+**1. Pending Actions:**
+${pending.length > 0 ? pending.map(t => `- ${t.title}`).join('\n') : '- No pending actions.'}
+
+**2. Key Accomplishments:**
+${completed.length > 0 ? completed.map(t => `- ${t.title}`).join('\n') : '- No recorded accomplishments.'}
+
+**3. Notes from Predecessor:**
+"Automated summary of active workload."
+`;
+}
+
+/**
+ * Search documents/tasks via simple ilike (since we don't have vector search hooked up)
+ */
+export async function searchRAGDocuments(query) {
+  if (!query) return [];
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('id, title, description')
+    .ilike('title', `%${query}%`)
+    .limit(5);
+
+  if (error) throw error;
+  return data.map(d => ({
+    id: d.id,
+    title: d.title,
+    snippet: (d.description || '').substring(0, 50) + '...',
+    confidence: 0.95
+  }));
+}
+

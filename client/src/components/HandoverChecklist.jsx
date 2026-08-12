@@ -1,28 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { getHandoverChecklist, toggleChecklistTask } from '../services/mockApi';
+import { fetchTasks, updateTask } from '../services/taskService';
+import { useAuth } from '../context/AuthContext';
 import { CheckCircle2, Circle, AlertCircle } from 'lucide-react';
 import clsx from 'clsx';
 
 const HandoverChecklist = () => {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getHandoverChecklist('role-123').then(data => {
-      setTasks(data);
-      setLoading(false);
-    });
-  }, []);
+    if (user?.id) {
+      fetchTasks(user.id).then(data => {
+        setTasks(data);
+        setLoading(false);
+      });
+    }
+  }, [user]);
 
   const handleToggle = async (taskId, currentStatus) => {
+    const newStatus = currentStatus === 'Done' ? 'Not Started' : 'Done';
     // Optimistic update
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: currentStatus === 'pending' ? 'completed' : 'pending' } : t));
-    await toggleChecklistTask(taskId, currentStatus);
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+    await updateTask(taskId, { status: newStatus });
   };
 
   if (loading) return <div className="p-8 text-center animate-pulse text-slate-500">Loading checklist...</div>;
 
-  const completedCount = tasks.filter(t => t.status === 'completed').length;
+  const completedCount = tasks.filter(t => t.status === 'Done').length;
   const progress = Math.round((completedCount / tasks.length) * 100) || 0;
 
   return (
@@ -49,7 +54,7 @@ const HandoverChecklist = () => {
             onClick={() => handleToggle(task.id, task.status)}
           >
             <div className="mt-0.5">
-              {task.status === 'completed' ? (
+              {task.status === 'Done' ? (
                 <CheckCircle2 className="w-6 h-6 text-green-500 transition-transform hover:scale-110" />
               ) : (
                 <Circle className="w-6 h-6 text-slate-300 dark:text-slate-600 hover:text-blue-500 transition-colors" />
@@ -57,13 +62,13 @@ const HandoverChecklist = () => {
             </div>
             <div className="flex-1">
               <div className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1">
-                {task.category}
+                {task.category?.name || 'Uncategorized'}
               </div>
               <div className={clsx(
                 "text-base transition-all duration-300",
-                task.status === 'completed' ? "text-slate-400 line-through" : "text-slate-800 dark:text-slate-200 font-medium"
+                task.status === 'Done' ? "text-slate-400 line-through" : "text-slate-800 dark:text-slate-200 font-medium"
               )}>
-                {task.task}
+                {task.title}
               </div>
             </div>
           </div>

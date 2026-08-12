@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getAdminMetrics } from '../services/mockApi';
+import { getAdminMetrics } from '../services/taskService';
 import { Users, CheckCircle2, Clock, BarChart3, TrendingUp } from 'lucide-react';
 
 const AdminDashboard = () => {

@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { generateAIBrief } from '../services/mockApi';
+import { generateAIBrief } from '../services/taskService';
+import { useAuth } from '../context/AuthContext';
 import { Sparkles, FileText, Download } from 'lucide-react';
 
 const AIBriefGenerator = () => {
+  const { user } = useAuth();
   const [brief, setBrief] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const handleGenerate = async () => {
+    if (!user?.id) return;
     setLoading(true);
-    const data = await generateAIBrief('role-123');
+    const data = await generateAIBrief(user.id);
     setBrief(data);
     setLoading(false);
   };

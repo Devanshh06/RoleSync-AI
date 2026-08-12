@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { searchRAGDocuments } from '../services/mockApi';
+import { searchRAGDocuments } from '../services/taskService';
 import { Search, BrainCircuit, ExternalLink, FileText } from 'lucide-react';
 
 const SemanticSearch = () => {
