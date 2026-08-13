@@ -103,7 +103,7 @@ const TasksPage = () => {
         title: formData.title,
         description: formData.description || null,
         category_id: formData.category_id || null,
-        assigned_to: user?.id,
+        assigned_to: formData.assigned_to || user?.id,
         created_by: user?.id,
         priority: formData.priority,
         date_assigned: formData.date_assigned,
@@ -372,6 +372,7 @@ const TasksPage = () => {
         staffList={staffList}
         currentUserId={user?.id}
         isSubmitting={isSubmitting}
+        isAdmin={user?.userType === 'Admin'}
       />
     </div>
   );

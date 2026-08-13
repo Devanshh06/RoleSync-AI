@@ -1,10 +1,10 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, CheckSquare, Sparkles, Search, Users, FolderOpen, UserCog, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, Sparkles, Search, Users, FolderOpen, UserCog, ClipboardList, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../context/AuthContext';
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen, onClose }) => {
   const { user } = useAuth();
   const isAdmin = user?.userType === 'Admin';
 
@@ -24,7 +24,7 @@ const Sidebar = () => {
     {
       label: 'Handover',
       items: [
-        { to: '/handover', icon: CheckSquare, label: 'Handover Workspace' },
+        { to: '/handover', icon: CheckSquare, label: 'Handover Access' },
         { to: '/ai-brief', icon: Sparkles, label: 'AI Brief Generator' },
         { to: '/search', icon: Search, label: 'Institutional Search' },
       ],
@@ -34,7 +34,7 @@ const Sidebar = () => {
           {
             label: 'Administration',
             items: [
-              { to: '/admin', icon: Users, label: 'HOD Analytics' },
+              { to: '/admin', icon: Users, label: 'HOD Dashboard' },
               { to: '/faculty', icon: UserCog, label: 'Faculty Management' },
               { to: '/roles', icon: FolderOpen, label: 'Role Directory' },
             ],
@@ -43,9 +43,17 @@ const Sidebar = () => {
       : []),
   ];
 
-  return (
-    <aside className="w-64 border-r border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl hidden md:flex flex-col h-[calc(100vh-64px)] sticky top-[64px]">
+  const sidebarContent = (
+    <>
       <div className="p-4 flex-1 overflow-y-auto">
+        {/* Mobile close button */}
+        <div className="flex items-center justify-between mb-4 md:hidden">
+          <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Menu</span>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+            <X className="w-5 h-5 text-slate-500" />
+          </button>
+        </div>
+
         {navGroups.map((group) => (
           <div key={group.label} className="mb-6">
             <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-3">
@@ -59,6 +67,7 @@ const Sidebar = () => {
                     key={item.to}
                     to={item.to}
                     end={item.to === '/'}
+                    onClick={onClose}
                     className={({ isActive }) => clsx(
                       'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group',
                       isActive 
@@ -93,7 +102,26 @@ const Sidebar = () => {
           </div>
         </div>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Desktop sidebar — always visible */}
+      <aside className="w-64 border-r border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl hidden md:flex flex-col h-[calc(100vh-64px)] sticky top-[64px]">
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile sidebar — slide-in overlay */}
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40 md:hidden animate-fade-in" onClick={onClose} />
+          <aside className="fixed top-0 left-0 w-72 h-full bg-white dark:bg-slate-900 z-50 md:hidden flex flex-col shadow-2xl animate-slide-in-left">
+            {sidebarContent}
+          </aside>
+        </>
+      )}
+    </>
   );
 };
 

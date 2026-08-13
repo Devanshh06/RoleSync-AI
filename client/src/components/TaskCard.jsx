@@ -67,9 +67,16 @@ const TaskCard = ({ task, onDelete, onStatusChange, categoryColor }) => {
         </div>
 
         {/* Title */}
-        <h3 className="text-base font-bold text-slate-900 dark:text-white mb-2 leading-snug line-clamp-2">
-          {task.title}
-        </h3>
+        <div className="flex items-center gap-2 mb-2">
+          <h3 className="text-base font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">
+            {task.title}
+          </h3>
+          {task.created_by && task.created_by !== task.assigned_to && (
+            <span className="text-[10px] font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded-md uppercase shrink-0">
+              HOD
+            </span>
+          )}
+        </div>
 
         {/* Description preview */}
         {task.description && (

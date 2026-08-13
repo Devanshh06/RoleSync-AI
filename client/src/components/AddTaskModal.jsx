@@ -23,6 +23,7 @@ const AddTaskModal = ({
   staffList = [],
   currentUserId,
   isSubmitting = false,
+  isAdmin = false,
 }) => {
   const overlayRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -36,6 +37,7 @@ const AddTaskModal = ({
     deadline: '',
     notes: '',
     coordinatorIds: [],
+    assigned_to: currentUserId || '',
   });
   const [file, setFile] = useState(null);
   const [errors, setErrors] = useState({});
@@ -54,6 +56,7 @@ const AddTaskModal = ({
         deadline: '',
         notes: '',
         coordinatorIds: [],
+        assigned_to: currentUserId || '',
       });
       setFile(null);
       setErrors({});
@@ -241,6 +244,30 @@ const AddTaskModal = ({
                 className="input-field resize-none"
               />
             </div>
+
+            {/* Assign to (HOD only) */}
+            {isAdmin && (
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  <Users className="w-3.5 h-3.5 inline mr-1" />
+                  Assign To
+                </label>
+                <select
+                  id="task-assign-to"
+                  value={form.assigned_to}
+                  onChange={(e) => updateField('assigned_to', e.target.value)}
+                  className="input-field appearance-none cursor-pointer"
+                >
+                  <option value={currentUserId}>Myself</option>
+                  {staffList
+                    .filter(s => s.id !== currentUserId)
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>{s.full_name} — {s.department || 'No dept'}</option>
+                    ))}
+                </select>
+                <p className="text-xs text-slate-400 mt-1">As HOD, you can assign tasks to any faculty member.</p>
+              </div>
+            )}
 
             {/* Dates row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

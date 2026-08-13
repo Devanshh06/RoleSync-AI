@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Bell, Search, UserCircle, GraduationCap, Sun, Moon, LogOut, ChevronDown } from 'lucide-react';
+import { Bell, Search, UserCircle, GraduationCap, Sun, Moon, LogOut, ChevronDown, Menu } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
-const Navbar = () => {
+const Navbar = ({ onToggleSidebar }) => {
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -20,14 +20,25 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="glass sticky top-0 z-50 px-6 py-3 flex items-center justify-between">
-      <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-        <GraduationCap className="w-8 h-8" />
-        <span className="text-xl font-bold tracking-tight">RoleSync</span>
-        <span className="text-[10px] font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded-md uppercase tracking-wider ml-1">AI</span>
+    <nav className="glass sticky top-0 z-50 px-4 sm:px-6 py-3 flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        {/* Hamburger — mobile only */}
+        <button
+          onClick={onToggleSidebar}
+          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors md:hidden"
+          aria-label="Toggle menu"
+        >
+          <Menu className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+        </button>
+
+        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+          <GraduationCap className="w-7 h-7 sm:w-8 sm:h-8" />
+          <span className="text-lg sm:text-xl font-bold tracking-tight">RoleSync</span>
+          <span className="text-[10px] font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded-md uppercase tracking-wider ml-1">AI</span>
+        </div>
       </div>
       
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
         {/* Quick search */}
         <div className="relative hidden md:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -59,18 +70,18 @@ const Navbar = () => {
         <div className="relative">
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
-            className="flex items-center gap-3 pl-4 border-l border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg px-3 py-1.5 transition-colors"
+            className="flex items-center gap-2 sm:gap-3 sm:pl-4 sm:border-l border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg px-2 sm:px-3 py-1.5 transition-colors"
           >
             <div className="text-right hidden sm:block">
               <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">
                 {user?.name || 'User'}
               </div>
               <div className="text-xs text-slate-500 dark:text-slate-400">
-                {user?.userType === 'Admin' ? 'Administrator' : user?.department || 'Faculty'}
+                {user?.userType === 'Admin' ? 'HOD / Admin' : user?.department || 'Faculty'}
               </div>
             </div>
             <div className="relative">
-              <UserCircle className="w-9 h-9 text-slate-400" />
+              <UserCircle className="w-8 h-8 sm:w-9 sm:h-9 text-slate-400" />
               {user?.status === 'Leaving' && (
                 <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-amber-500 rounded-full border-2 border-white dark:border-slate-900" />
               )}

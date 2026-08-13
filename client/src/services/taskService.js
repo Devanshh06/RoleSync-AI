@@ -217,6 +217,84 @@ export async function uploadDocument(file) {
   };
 }
 
+// ─── Dashboard Helpers ─────────────────────────────────────
+
+/**
+ * Dashboard stats for a staff member.
+ */
+export async function fetchDashboardStats(staffId) {
+  if (!isValidUUID(staffId)) return { total: 0, pending: 0, completed: 0, overdue: 0 };
+
+  const { data: tasks, error } = await supabase
+    .from('tasks')
+    .select('id, status, deadline')
+    .eq('assigned_to', staffId);
+
+  if (error) throw error;
+  const now = new Date();
+  return {
+    total: tasks.length,
+    pending: tasks.filter(t => t.status === 'Not Started' || t.status === 'In Progress').length,
+    completed: tasks.filter(t => t.status === 'Done').length,
+    overdue: tasks.filter(t => t.deadline && t.status !== 'Done' && new Date(t.deadline) < now).length,
+  };
+}
+
+/**
+ * Tasks with deadlines in the next N days.
+ */
+export async function fetchUpcomingTasks(staffId, days = 7) {
+  if (!isValidUUID(staffId)) return [];
+  const now = new Date();
+  const future = new Date(now.getTime() + days * 86400000);
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*, category:task_categories(*)')
+    .eq('assigned_to', staffId)
+    .neq('status', 'Done')
+    .gte('deadline', now.toISOString().split('T')[0])
+    .lte('deadline', future.toISOString().split('T')[0])
+    .order('deadline', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Recently updated tasks for activity feed.
+ */
+export async function fetchRecentActivity(staffId, limit = 10) {
+  if (!isValidUUID(staffId)) return [];
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*, category:task_categories(*), creator:staff!tasks_created_by_fkey(id, full_name)')
+    .eq('assigned_to', staffId)
+    .order('updated_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Tasks with date ranges for Gantt chart.
+ */
+export async function fetchGanttTasks(staffId) {
+  if (!isValidUUID(staffId)) return [];
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('id, title, status, priority, date_assigned, deadline, category:task_categories(name, color)')
+    .eq('assigned_to', staffId)
+    .not('deadline', 'is', null)
+    .order('date_assigned', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
 // ─── Reporting & AI (Replaced from Mock) ───────────────────
 
 /**

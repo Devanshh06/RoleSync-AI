@@ -1,0 +1,161 @@
+# RoleSync-AI: Faculty Work Manager Pivot
+
+Pivoting the app from a handover-only system into a **faculty work management platform** with task tracking, HOD task assignment, reminders, timeline summaries, handover access requests, responsive mobile view, UI polish, document vault, and AI agent features.
+
+## User Review Required
+
+> [!IMPORTANT]
+> This is a **7-item scope**. Some items (like the AI Agent reading Gmail via API, or a full notification push system) are deep backend/infra work. I recommend phasing this into **3 phases** so you get working features fast instead of a month-long rewrite.
+
+> [!WARNING]  
+> **Item 6 (AI Agent reading Gmail)** requires a Google Cloud project with Gmail API OAuth consent, server-side credential storage, and periodic polling. This is a significant backend effort that needs its own dedicated phase and likely a backend service (not just Supabase). I've scoped it as Phase 3.
+
+## Open Questions
+
+1. **HOD role vs Admin role**: Currently the DB has `user_type IN ('Admin', 'Faculty')`. Should HOD be a separate `user_type`, or is Admin = HOD? I'll assume **Admin = HOD** unless you say otherwise.
+
+2. **Notifications**: Do you want browser push notifications (requires service worker + VAPID setup), or are in-app notification toasts + a notification bell dropdown sufficient for Phase 1?
+
+3. **Timeline chart**: Are you thinking a Gantt-style chart, or a vertical activity timeline (like a git log)? I'll go with a **vertical activity timeline** since it's simpler and more useful for daily tracking — let me know if you want Gantt.
+
+4. **Backend for AI Agent (Phase 3)**: The current app is Supabase-only (no Express/Node backend). The Gmail agent + document parsing will need a backend. Do you have a preferred hosting for that (Vercel serverless, Railway, your own VPS), or should I plan for Supabase Edge Functions?
+
+---
+
+## Phase 1: Core Faculty Work Manager (This Session)
+
+Turn the app from "handover system" into "faculty work management" with immediate, tangible value.
+
+### 1A. Dashboard Overhaul — Faculty Dashboard
+
+Make the dashboard a **real working dashboard** instead of hardcoded mock data.
+
+#### [MODIFY] [DashboardPage.jsx](file:///e:/Projects/RoleSync-AI/client/src/pages/DashboardPage.jsx)
+- Replace hardcoded stats with live data from Supabase (task counts, completion %, upcoming deadlines)
+- Add **upcoming tasks/events section** (next 7 days deadline tasks)
+- Add a **recent activity feed** pulled from real task updates (ordered by `updated_at`)
+- Show "HOD assigned this" badge on tasks where `created_by !== assigned_to`
+- Add quick-add-task inline (reuse existing AddTaskModal trigger)
+- Add a **timeline summary section** — vertical activity timeline showing task status changes over time
+
+#### [MODIFY] [taskService.js](file:///e:/Projects/RoleSync-AI/client/src/services/taskService.js)
+- Add `fetchUpcomingTasks(staffId, days=7)` — tasks with deadline in next N days
+- Add `fetchDashboardStats(staffId)` — returns `{total, pending, completed, overdue}` computed from DB
+- Add `fetchRecentActivity(staffId, limit=10)` — tasks ordered by `updated_at DESC`
+
+---
+
+### 1B. HOD Task Assignment
+
+HODs (Admins) can assign tasks to any faculty, with the task appearing on that faculty's dashboard with a "Assigned by HOD" badge.
+
+#### [MODIFY] [TasksPage.jsx](file:///e:/Projects/RoleSync-AI/client/src/pages/TasksPage.jsx)
+- If user is Admin, show a **target faculty selector** in the Add Task modal so HOD can pick who to assign to
+- Show "Assigned by: [HOD name]" on tasks where `created_by !== assigned_to`
+
+#### [MODIFY] [AddTaskModal.jsx](file:///e:/Projects/RoleSync-AI/client/src/components/AddTaskModal.jsx)
+- Add an "Assign to" field (dropdown of faculty) visible when user is Admin
+- Defaults to self for regular faculty
+
+#### [MODIFY] [TaskCard.jsx](file:///e:/Projects/RoleSync-AI/client/src/components/TaskCard.jsx)
+- Show "Assigned by HOD" badge when `created_by !== assigned_to`
+
+---
+
+### 1C. Handover System Refinement
+
+Keep the existing handover flow but make it clearer: new faculty requests access to outgoing faculty's tasks/documents/events.
+
+#### [MODIFY] [HandoverPage.jsx](file:///e:/Projects/RoleSync-AI/client/src/pages/HandoverPage.jsx)
+- Add a **"Request Access"** button that lets a new faculty search for and request access to any current faculty's workspace
+- On approval, successor can view all predecessor's tasks, documents, events
+- Wire the AI Brief Generator to have context from the predecessor's full task history when accessed through a handover workspace
+
+#### [MODIFY] [handoverService.js](file:///e:/Projects/RoleSync-AI/client/src/services/handoverService.js)
+- Add `createHandoverRequest(predecessorId, successorId)` if not already present
+- Ensure the workspace view shows documents too (use existing `document_url` on tasks)
+
+---
+
+### 1D. Mobile Responsiveness
+
+#### [MODIFY] [Sidebar.jsx](file:///e:/Projects/RoleSync-AI/client/src/components/Sidebar.jsx)
+- Add hamburger menu toggle for mobile (sidebar currently `hidden md:flex`)
+- Slide-in overlay sidebar on mobile with backdrop
+
+#### [MODIFY] [Navbar.jsx](file:///e:/Projects/RoleSync-AI/client/src/components/Navbar.jsx)
+- Add hamburger button visible on mobile that toggles sidebar
+- Ensure profile dropdown works on touch
+
+#### [MODIFY] [App.jsx](file:///e:/Projects/RoleSync-AI/client/src/App.jsx)
+- Lift sidebar open/close state to AppLayout so Navbar hamburger can control it
+
+#### [MODIFY] [index.css](file:///e:/Projects/RoleSync-AI/client/src/index.css)
+- Add mobile overlay styles for sidebar
+
+---
+
+### 1E. UI Polish — Loading Screen, Animations, Navbar Improvements
+
+#### [NEW] [LoadingScreen.jsx](file:///e:/Projects/RoleSync-AI/client/src/components/LoadingScreen.jsx)
+- Full-screen animated loading screen shown during initial auth check (`isLoading` in AuthContext)
+- RoleSync logo + spinner animation
+
+#### [MODIFY] [App.jsx](file:///e:/Projects/RoleSync-AI/client/src/App.jsx)
+- Show LoadingScreen while `isLoading` is true
+
+#### [MODIFY] [Navbar.jsx](file:///e:/Projects/RoleSync-AI/client/src/components/Navbar.jsx)
+- Add notification bell with dropdown (in-app notifications, not push for now)
+- Add "Profile" link in user menu dropdown
+
+---
+
+## Phase 2: Document Vault, Notifications, Settings & Profiles
+
+### 2A. Common Document Vault
+- **[NEW]** `documents` table in Supabase (id, title, uploaded_by, file_url, file_name, target_scope: 'all' | 'specific', mentioned_staff_ids, created_at)
+- **[NEW]** DocumentVaultPage — upload docs for all or specific faculty, auto-creates tasks
+- **[NEW]** Route `/vault` + sidebar entry
+
+### 2B. Notification System
+- **[NEW]** `notifications` table in Supabase (id, user_id, type, title, message, read, created_at)
+- **[NEW]** NotificationDropdown in Navbar — fetches unread count, lists recent
+- Trigger notifications on: task assigned, handover request, document shared, deadline approaching
+
+### 2C. User Profile & Settings
+- **[NEW]** ProfilePage — view/edit name, department, avatar, contact
+- **[NEW]** SettingsPage — notification preferences, theme, export task list to CSV
+
+### 2D. Task Reminders
+- Supabase Edge Function (cron) that checks tasks with upcoming deadlines, inserts notification rows
+- Client polls or subscribes to realtime for new notifications
+
+---
+
+## Phase 3: AI Agent (Gmail, Document Parsing, Chat)
+
+### 3A. Gmail Integration
+- Google Cloud project + Gmail API OAuth
+- Backend service (Edge Function or Node) that reads inbox, parses academic emails, creates tasks
+
+### 3B. Document Intelligence
+- Parse uploaded PDFs/docs for action items
+- Auto-suggest tasks from document content
+
+### 3C. Context-Aware Chat
+- Maintain a context vector store of all tasks/docs/progress
+- Chat interface where anyone can ask questions about faculty workload, history, etc.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- `npm run build` to verify no compile errors after each component change
+
+### Manual Verification
+- Login as Faculty → verify dashboard shows real stats, upcoming tasks, timeline
+- Login as Admin/HOD → verify can assign tasks to any faculty
+- Test handover request flow end-to-end
+- Resize browser to mobile width → verify sidebar hamburger, responsive layout
+- Verify loading screen appears on page refresh
