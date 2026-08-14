@@ -4,6 +4,7 @@ import cors from 'cors';
 import taskRoutes from './routes/tasks.js';
 import staffRoutes from './routes/staff.js';
 import handoverRoutes from './routes/handovers.js';
+import documentRoutes from './routes/documents.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -15,6 +16,7 @@ app.use(express.json());
 app.use('/api/tasks', taskRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/handovers', handoverRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));

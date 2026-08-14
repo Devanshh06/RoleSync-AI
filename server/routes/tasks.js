@@ -107,4 +107,41 @@ router.post('/', async (req, res) => {
   res.status(201).json(task);
 });
 
+// PATCH /api/tasks/:id — update a task
+router.patch('/:id', async (req, res) => {
+  const { data, error } = await supabase
+    .from('tasks')
+    .update(req.body)
+    .eq('id', req.params.id)
+    .select('*, category:task_categories(*), coordinators:task_coordinators(staff:staff(id, full_name, email, avatar_url))')
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+// DELETE /api/tasks/:id — delete a task
+router.delete('/:id', async (req, res) => {
+  const { error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('id', req.params.id);
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(204).end();
+});
+
+// GET /api/tasks/:staffId/category/:categoryId — filter tasks by category
+router.get('/:staffId/category/:categoryId', async (req, res) => {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*, category:task_categories(*), coordinators:task_coordinators(staff:staff(id, full_name, email, avatar_url))')
+    .eq('assigned_to', req.params.staffId)
+    .eq('category_id', req.params.categoryId)
+    .order('created_at', { ascending: false });
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
 export default router;

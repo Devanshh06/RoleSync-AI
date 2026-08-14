@@ -20,6 +20,9 @@ import FacultyListPage from './pages/FacultyListPage';
 import FacultyProfilePage from './pages/FacultyProfilePage';
 import RoleDirectoryPage from './pages/RoleDirectoryPage';
 import TasksPage from './pages/TasksPage';
+import DocumentVaultPage from './pages/DocumentVaultPage';
+import ProfilePage from './pages/ProfilePage';
+import SettingsPage from './pages/SettingsPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import NotFoundPage from './pages/NotFoundPage';
 
@@ -70,6 +73,9 @@ const AppContent = () => {
           <Route path="/ai-brief" element={<AIBriefPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/tasks" element={<TasksPage />} />
+          <Route path="/vault" element={<DocumentVaultPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
           {/* Admin-only routes */}

@@ -99,12 +99,28 @@ const Navbar = ({ onToggleSidebar }) => {
                   <div className="text-xs text-slate-500">{user?.email}</div>
                 </div>
                 <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  onClick={() => { setShowUserMenu(false); navigate('/profile'); }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                 >
-                  <LogOut className="w-4 h-4" />
-                  Sign out
+                  <UserCircle className="w-4 h-4" />
+                  My Profile
                 </button>
+                <button
+                  onClick={() => { setShowUserMenu(false); navigate('/settings'); }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                >
+                  <Menu className="w-4 h-4" />
+                  Settings
+                </button>
+                <div className="border-t border-slate-100 dark:border-slate-800 mt-1 pt-1">
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sign out
+                  </button>
+                </div>
               </div>
             </>
           )}

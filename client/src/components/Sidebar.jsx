@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, CheckSquare, Sparkles, Search, Users, FolderOpen, UserCog, ClipboardList, X } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, Sparkles, Search, Users, FolderOpen, UserCog, ClipboardList, Archive, Settings, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../context/AuthContext';
 
@@ -19,6 +19,12 @@ const Sidebar = ({ isOpen, onClose }) => {
       label: 'Tasks',
       items: [
         { to: '/tasks', icon: ClipboardList, label: 'My Tasks' },
+      ],
+    },
+    {
+      label: 'Resources',
+      items: [
+        { to: '/vault', icon: Archive, label: 'Document Vault' },
       ],
     },
     {
@@ -41,6 +47,12 @@ const Sidebar = ({ isOpen, onClose }) => {
           },
         ]
       : []),
+    {
+      label: 'Account',
+      items: [
+        { to: '/settings', icon: Settings, label: 'Settings' },
+      ],
+    },
   ];
 
   const sidebarContent = (
