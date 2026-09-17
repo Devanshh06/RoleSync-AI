@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Archive, Upload, FileText, Search, Trash2, Loader2, Plus, X,
-  Users, User, Download, Calendar, Filter, UploadCloud, File,
+  Users, User, Download, Calendar, Filter, UploadCloud, File, Sparkles
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -10,6 +10,7 @@ import EmptyState from '../components/ui/EmptyState';
 import { fetchDocuments, uploadVaultDocument, deleteDocument } from '../services/documentService';
 import { fetchAllStaff } from '../services/staffService';
 import { useAuth } from '../context/AuthContext';
+import apiClient from '../api/client';
 
 const DocumentVaultPage = () => {
   const { user } = useAuth();
@@ -32,6 +33,11 @@ const DocumentVaultPage = () => {
   const [staffSearch, setStaffSearch] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // AI Extraction Modal
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiTasks, setAiTasks] = useState([]);
 
   useEffect(() => {
     loadDocuments();
@@ -78,7 +84,33 @@ const DocumentVaultPage = () => {
     if (file) handleFileSelect(file);
   };
 
-  const handleUpload = async () => {
+  const handleAnalyzeAndUpload = async () => {
+    if (!uploadForm.file || !uploadForm.title.trim()) return;
+    setIsAnalyzing(true);
+    try {
+      const formData = new FormData();
+      formData.append('document', uploadForm.file);
+      const res = await apiClient.post('/documents/parse', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const data = res.data;
+      
+      if (data.tasks && data.tasks.length > 0) {
+        setAiTasks(data.tasks);
+        setShowAiModal(true);
+      } else {
+        await handleUpload([]);
+      }
+    } catch (err) {
+      console.error(err);
+      // Fallback to normal upload
+      await handleUpload([]);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleUpload = async (tasksToCreate = []) => {
     if (!uploadForm.file || !uploadForm.title.trim()) return;
     setIsUploading(true);
     try {
@@ -88,10 +120,12 @@ const DocumentVaultPage = () => {
         uploadForm.description.trim(),
         uploadForm.targetScope,
         uploadForm.targetStaffIds,
-        user?.id
+        user?.id,
+        tasksToCreate
       );
       await loadDocuments();
       setShowUploadModal(false);
+      setShowAiModal(false);
       setUploadForm({ title: '', description: '', file: null, targetScope: 'all', targetStaffIds: [] });
     } catch (err) {
       alert('Upload failed: ' + (err.message || 'Unknown error'));
@@ -292,12 +326,12 @@ const DocumentVaultPage = () => {
             <Button variant="secondary" onClick={() => setShowUploadModal(false)} disabled={isUploading}>Cancel</Button>
             <Button
               variant="primary"
-              icon={Upload}
-              onClick={handleUpload}
-              loading={isUploading}
-              disabled={!uploadForm.file || !uploadForm.title.trim() || isUploading}
+              icon={isAnalyzing ? Loader2 : Upload}
+              onClick={handleAnalyzeAndUpload}
+              loading={isAnalyzing || isUploading}
+              disabled={!uploadForm.file || !uploadForm.title.trim() || isAnalyzing || isUploading}
             >
-              Upload & Share
+              {isAnalyzing ? 'Analyzing AI...' : 'Upload & Share'}
             </Button>
           </>
         }
@@ -460,6 +494,56 @@ const DocumentVaultPage = () => {
                 })}
               </div>
             </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* AI Tasks Modal */}
+      <Modal
+        isOpen={showAiModal}
+        onClose={() => setShowAiModal(false)}
+        title={
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-purple-500" />
+            AI Suggested Tasks
+          </div>
+        }
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => handleUpload([])} disabled={isUploading}>Skip & Upload</Button>
+            <Button variant="primary" onClick={() => handleUpload(aiTasks)} loading={isUploading} disabled={isUploading}>
+              Approve & Create Tasks
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4 max-h-96 overflow-y-auto">
+          <p className="text-sm text-slate-500 mb-2">
+            RoleSync AI analyzed your document and found the following tasks to assign:
+          </p>
+          {aiTasks.map((task, i) => (
+            <div key={i} className="p-4 bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-800 rounded-xl relative group">
+              <button 
+                onClick={() => setAiTasks(prev => prev.filter((_, idx) => idx !== i))}
+                className="absolute top-2 right-2 p-1 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Remove task"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1">{task.title}</h4>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">{task.description}</p>
+              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                task.priority === 'High' || task.priority === 'Urgent' 
+                  ? 'bg-red-100 text-red-700' 
+                  : 'bg-blue-100 text-blue-700'
+              }`}>
+                {task.priority} Priority
+              </span>
+            </div>
+          ))}
+          {aiTasks.length === 0 && (
+            <p className="text-sm text-slate-500 italic">No tasks remaining.</p>
           )}
         </div>
       </Modal>

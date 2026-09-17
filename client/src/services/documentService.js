@@ -24,7 +24,7 @@ export async function fetchDocuments() {
  * Upload a document to Supabase Storage and create DB entry.
  * Auto-creates tasks for target staff.
  */
-export async function uploadVaultDocument(file, title, description, targetScope, targetStaffIds = [], uploaderId) {
+export async function uploadVaultDocument(file, title, description, targetScope, targetStaffIds = [], uploaderId, aiTasks = []) {
   if (!file) throw new Error('No file provided');
 
   // 1. Upload to Supabase Storage
@@ -82,17 +82,37 @@ export async function uploadVaultDocument(file, title, description, targetScope,
 
   // 4. Auto-create tasks for each target
   if (resolvedTargetIds.length > 0) {
-    const taskRows = resolvedTargetIds.map(staffId => ({
-      title: `📄 Review: ${title}`,
-      description: description || `A document "${title}" has been shared with you. Please review it.`,
-      assigned_to: staffId,
-      created_by: uploaderId,
-      status: 'Not Started',
-      priority: 'Medium',
-      date_assigned: new Date().toISOString().split('T')[0],
-      document_url: fileUrl,
-      document_name: file.name,
-    }));
+    let taskRows = [];
+    
+    if (aiTasks && aiTasks.length > 0) {
+      resolvedTargetIds.forEach(staffId => {
+        aiTasks.forEach(task => {
+          taskRows.push({
+            title: task.title,
+            description: task.description || `Extracted from document: ${title}`,
+            assigned_to: staffId,
+            created_by: uploaderId,
+            status: 'Not Started',
+            priority: task.priority || 'Medium',
+            date_assigned: new Date().toISOString().split('T')[0],
+            document_url: fileUrl,
+            document_name: file.name,
+          });
+        });
+      });
+    } else {
+      taskRows = resolvedTargetIds.map(staffId => ({
+        title: `📄 Review: ${title}`,
+        description: description || `A document "${title}" has been shared with you. Please review it.`,
+        assigned_to: staffId,
+        created_by: uploaderId,
+        status: 'Not Started',
+        priority: 'Medium',
+        date_assigned: new Date().toISOString().split('T')[0],
+        document_url: fileUrl,
+        document_name: file.name,
+      }));
+    }
     await supabase.from('tasks').insert(taskRows);
   }
 

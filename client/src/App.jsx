@@ -6,6 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import LoadingScreen from './components/LoadingScreen';
+import ChatBot from './components/ChatBot';
 import './App.css';
 
 // Pages
@@ -46,6 +47,7 @@ const AppLayout = () => {
           </div>
         </main>
       </div>
+      <ChatBot />
     </div>
   );
 };

@@ -1,7 +1,13 @@
 import { Router } from 'express';
+import multer from 'multer';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
 import supabase from '../lib/supabase.js';
+import { generateAIContent } from '../utils/aiClient.js';
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage() });
 
 // GET /api/documents — list all documents with uploader info
 router.get('/', async (req, res) => {
@@ -20,7 +26,7 @@ router.get('/', async (req, res) => {
 
 // POST /api/documents — create document + targets + auto-create tasks
 router.post('/', async (req, res) => {
-  const { title, description, file_url, file_name, uploaded_by, target_scope, target_staff_ids } = req.body;
+  const { title, description, file_url, file_name, uploaded_by, target_scope, target_staff_ids, aiTasks } = req.body;
 
   // 1. Insert the document
   const { data: doc, error: docError } = await supabase
@@ -51,17 +57,40 @@ router.post('/', async (req, res) => {
 
   // 3. Auto-create tasks for each target staff
   if (targetIds.length > 0) {
-    const taskRows = targetIds.map(staffId => ({
-      title: `📄 Review: ${title}`,
-      description: description || `A document "${title}" has been shared with you. Please review it.`,
-      assigned_to: staffId,
-      created_by: uploaded_by,
-      status: 'Not Started',
-      priority: 'Medium',
-      date_assigned: new Date().toISOString().split('T')[0],
-      document_url: file_url,
-      document_name: file_name,
-    }));
+    let taskRows = [];
+    
+    if (aiTasks && aiTasks.length > 0) {
+      // Create AI-suggested tasks for each target
+      targetIds.forEach(staffId => {
+        aiTasks.forEach(task => {
+          taskRows.push({
+            title: task.title,
+            description: task.description || `Extracted from document: ${title}`,
+            assigned_to: staffId,
+            created_by: uploaded_by,
+            status: 'Not Started',
+            priority: task.priority || 'Medium',
+            date_assigned: new Date().toISOString().split('T')[0],
+            document_url: file_url,
+            document_name: file_name,
+          });
+        });
+      });
+    } else {
+      // Fallback generic task
+      taskRows = targetIds.map(staffId => ({
+        title: `📄 Review: ${title}`,
+        description: description || `A document "${title}" has been shared with you. Please review it.`,
+        assigned_to: staffId,
+        created_by: uploaded_by,
+        status: 'Not Started',
+        priority: 'Medium',
+        date_assigned: new Date().toISOString().split('T')[0],
+        document_url: file_url,
+        document_name: file_name,
+      }));
+    }
+    
     await supabase.from('tasks').insert(taskRows);
   }
 
@@ -77,6 +106,73 @@ router.delete('/:id', async (req, res) => {
 
   if (error) return res.status(500).json({ error: error.message });
   res.status(204).end();
+});
+
+// POST /api/documents/parse - Parse a document and suggest tasks
+router.post('/parse', upload.single('document'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  
+  try {
+    let text = '';
+    
+    // Parse PDF
+    if (req.file.mimetype === 'application/pdf') {
+      const pdfData = await pdfParse(req.file.buffer);
+      text = pdfData.text;
+    } else {
+      // For text files or others, assume UTF-8 text for now
+      text = req.file.buffer.toString('utf-8');
+    }
+
+    if (!text || text.trim().length === 0) {
+      return res.status(400).json({ error: 'Could not extract text from document.' });
+    }
+
+    const prompt = `
+      Analyze the following document text and extract any actionable tasks.
+      Document Name: ${req.file.originalname}
+      
+      Document Text:
+      ${text.substring(0, 30000)}
+
+      Return a JSON array of tasks. If there are no tasks, return an empty array [].
+      Schema for each task:
+      {
+        "title": "Short descriptive title of the task",
+        "description": "Detailed description or context",
+        "priority": "Medium" | "High" | "Urgent" | "Low"
+      }
+    `;
+
+    const systemInstruction = "You are an assistant that extracts tasks from academic documents. Only return valid JSON matching the schema.";
+    const responseSchema = {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          description: { type: "string" },
+          priority: { type: "string", enum: ["Low", "Medium", "High", "Urgent"] }
+        },
+        required: ["title", "description", "priority"]
+      }
+    };
+
+    const aiResponse = await generateAIContent(prompt, { systemInstruction, responseSchema });
+    
+    let extractedTasks = [];
+    try {
+      const cleaned = aiResponse.replace(/```(?:json)?/gi, '').trim();
+      extractedTasks = JSON.parse(cleaned);
+    } catch (err) {
+      console.error('Failed to parse AI response:', aiResponse);
+    }
+
+    res.json({ success: true, tasks: extractedTasks });
+  } catch (error) {
+    console.error('Document parsing error:', error);
+    res.status(500).json({ error: 'Failed to process document.' });
+  }
 });
 
 export default router;

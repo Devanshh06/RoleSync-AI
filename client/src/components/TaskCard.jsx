@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Calendar, Clock, FileText, Users, ChevronDown, ChevronUp,
   Trash2, Edit3, AlertTriangle, CheckCircle2, Circle, Loader2,
-  Paperclip, ExternalLink,
+  Paperclip, ExternalLink, Mail,
 } from 'lucide-react';
 import clsx from 'clsx';
 import StatusBadge from './ui/StatusBadge';
@@ -74,6 +74,12 @@ const TaskCard = ({ task, onDelete, onStatusChange, categoryColor }) => {
           {task.created_by && task.created_by !== task.assigned_to && (
             <span className="text-[10px] font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded-md uppercase shrink-0">
               HOD
+            </span>
+          )}
+          {task.description?.includes('(Generated from email:') && (
+            <span className="flex items-center gap-1 text-[10px] font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded-md uppercase shrink-0">
+              <Mail className="w-3 h-3" />
+              Email
             </span>
           )}
         </div>
