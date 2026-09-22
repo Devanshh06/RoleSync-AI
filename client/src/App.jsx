@@ -21,6 +21,7 @@ import FacultyListPage from './pages/FacultyListPage';
 import FacultyProfilePage from './pages/FacultyProfilePage';
 import RoleDirectoryPage from './pages/RoleDirectoryPage';
 import TasksPage from './pages/TasksPage';
+import TaskDetailsPage from './pages/TaskDetailsPage';
 import DocumentVaultPage from './pages/DocumentVaultPage';
 import ProfilePage from './pages/ProfilePage';
 import SettingsPage from './pages/SettingsPage';
@@ -75,6 +76,7 @@ const AppContent = () => {
           <Route path="/ai-brief" element={<AIBriefPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/tasks" element={<TasksPage />} />
+          <Route path="/tasks/:id" element={<TaskDetailsPage />} />
           <Route path="/vault" element={<DocumentVaultPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />

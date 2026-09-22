@@ -1,14 +1,55 @@
-import React, { useState } from 'react';
-import { Bell, Search, UserCircle, GraduationCap, Sun, Moon, LogOut, ChevronDown, Menu } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bell, Search, UserCircle, GraduationCap, Sun, Moon, LogOut, ChevronDown, Menu, Check } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { fetchNotifications, markAsRead, markAllAsRead } from '../services/notificationService';
 
 const Navbar = ({ onToggleSidebar }) => {
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+
+  useEffect(() => {
+    if (user?.id) {
+      loadNotifications();
+      // Simple polling for new notifications every 60s
+      const interval = setInterval(loadNotifications, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [user?.id]);
+
+  const loadNotifications = async () => {
+    try {
+      const data = await fetchNotifications(user.id);
+      setNotifications(data || []);
+    } catch (err) {
+      console.error('Failed to load notifications', err);
+    }
+  };
+
+  const handleMarkAsRead = async (id, e) => {
+    if (e) e.stopPropagation();
+    try {
+      await markAsRead(id);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    } catch (err) {
+      console.error('Failed to mark as read', err);
+    }
+  };
+
+  const handleMarkAllAsRead = async (e) => {
+    if (e) e.stopPropagation();
+    try {
+      await markAllAsRead(user.id);
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    } catch (err) {
+      console.error('Failed to mark all as read', err);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -18,6 +59,8 @@ const Navbar = ({ onToggleSidebar }) => {
   const handleSearchFocus = () => {
     navigate('/search');
   };
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
     <nav className="glass sticky top-0 z-50 px-4 sm:px-6 py-3 flex items-center justify-between">
@@ -61,15 +104,69 @@ const Navbar = ({ onToggleSidebar }) => {
         </button>
 
         {/* Notifications */}
-        <button className="relative p-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors">
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-        </button>
+        <div className="relative">
+          <button 
+            onClick={() => { setShowNotifications(!showNotifications); setShowUserMenu(false); }}
+            className="relative p-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+          >
+            <Bell className="w-5 h-5" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+            )}
+          </button>
+          
+          {showNotifications && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
+              <div className="absolute right-0 top-full mt-2 w-80 max-h-[28rem] overflow-y-auto bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 z-50 animate-slide-down scrollbar-thin">
+                <div className="sticky top-0 bg-white dark:bg-slate-900 px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between z-10">
+                  <div className="text-sm font-bold text-slate-800 dark:text-slate-200">Notifications</div>
+                  {unreadCount > 0 && (
+                    <button onClick={handleMarkAllAsRead} className="text-xs text-blue-600 hover:underline">
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
+                
+                {notifications.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-slate-500">
+                    No notifications yet.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {notifications.map(notif => (
+                      <div key={notif.id} className={`p-4 transition-colors ${notif.is_read ? 'opacity-70' : 'bg-blue-50/50 dark:bg-blue-900/10'}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">{notif.title}</div>
+                            <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">{notif.message}</div>
+                            <div className="text-[10px] text-slate-400 mt-2">
+                              {new Date(notif.created_at).toLocaleString()}
+                            </div>
+                          </div>
+                          {!notif.is_read && (
+                            <button 
+                              onClick={(e) => handleMarkAsRead(notif.id, e)}
+                              className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                              title="Mark as read"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
         
         {/* User profile dropdown */}
         <div className="relative">
           <button
-            onClick={() => setShowUserMenu(!showUserMenu)}
+            onClick={() => { setShowUserMenu(!showUserMenu); setShowNotifications(false); }}
             className="flex items-center gap-2 sm:gap-3 sm:pl-4 sm:border-l border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg px-2 sm:px-3 py-1.5 transition-colors"
           >
             <div className="text-right hidden sm:block">

@@ -92,6 +92,18 @@ router.post('/', async (req, res) => {
     }
     
     await supabase.from('tasks').insert(taskRows);
+
+    // Create notifications for all targets (excluding uploader)
+    const notificationRows = targetIds.filter(id => id !== uploaded_by).map(staffId => ({
+      user_id: staffId,
+      title: 'New Document & Tasks',
+      message: `A document "${title}" was shared with you. New tasks have been assigned.`,
+      type: 'document'
+    }));
+    
+    if (notificationRows.length > 0) {
+      await supabase.from('notifications').insert(notificationRows);
+    }
   }
 
   res.status(201).json(doc);

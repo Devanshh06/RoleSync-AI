@@ -44,6 +44,33 @@ export async function fetchTasks(staffId) {
 }
 
 /**
+ * Fetch a single task by ID
+ */
+export async function fetchTaskById(taskId) {
+  if (!isValidUUID(taskId)) return null;
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .select(`
+      *,
+      category:task_categories(*),
+      coordinators:task_coordinators(
+        staff:staff(id, full_name, email, avatar_url)
+      ),
+      creator:staff!tasks_created_by_fkey(id, full_name, email, avatar_url),
+      assignee:staff!tasks_assigned_to_fkey(id, full_name, email, avatar_url)
+    `)
+    .eq('id', taskId)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') return null; // Not found
+    throw error;
+  }
+  return data;
+}
+
+/**
  * Fetch tasks for a predecessor (someone who is handing over)
  */
 export async function fetchPredecessorTasks(predecessorId) {

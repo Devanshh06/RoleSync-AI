@@ -17,6 +17,7 @@
     "imapflow": "^2.0.5",
     "mailparser": "^3.9.28",
     "multer": "^2.4.0",
+    "node-cron": "^4.6.0",
     "pdf-parse": "^2.4.5"
   }
 }

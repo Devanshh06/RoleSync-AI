@@ -13,6 +13,7 @@ import AddTaskModal from '../components/AddTaskModal';
 import EmptyState from '../components/ui/EmptyState';
 import { fetchTasks, fetchTasksByCategory, createTask, updateTask, deleteTask, uploadDocument, fetchCategories } from '../services/taskService';
 import { fetchAllStaff } from '../services/staffService';
+import { Download } from 'lucide-react';
 
 // Icon mapping for categories
 const categoryIcons = {
@@ -166,6 +167,38 @@ const TasksPage = () => {
     );
   });
 
+  // Export tasks to CSV
+  const exportTasksToCSV = () => {
+    if (filteredTasks.length === 0) return;
+    
+    const headers = ['Title', 'Category', 'Priority', 'Status', 'Date Assigned', 'Deadline', 'Description', 'Notes'];
+    
+    const csvContent = [
+      headers.join(','),
+      ...filteredTasks.map(task => {
+        return [
+          `"${(task.title || '').replace(/"/g, '""')}"`,
+          `"${(task.category?.name || 'Uncategorized').replace(/"/g, '""')}"`,
+          `"${(task.priority || '').replace(/"/g, '""')}"`,
+          `"${(task.status || '').replace(/"/g, '""')}"`,
+          `"${(task.date_assigned || '').replace(/"/g, '""')}"`,
+          `"${(task.deadline || '').replace(/"/g, '""')}"`,
+          `"${(task.description || '').replace(/"/g, '""')}"`,
+          `"${(task.notes || '').replace(/"/g, '""')}"`
+        ].join(',');
+      })
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `tasks_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Stats
   const stats = {
     total: tasks.length,
@@ -193,14 +226,24 @@ const TasksPage = () => {
               Manage your responsibilities, deadlines, and coordinations
             </p>
           </div>
-          <button
-            id="add-task-btn"
-            onClick={() => setIsModalOpen(true)}
-            className="btn-primary flex items-center gap-2 px-5 py-2.5 text-sm shadow-lg shadow-blue-600/20 hover:shadow-blue-600/30"
-          >
-            <Plus className="w-4 h-4" />
-            Add Task
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={exportTasksToCSV}
+              disabled={filteredTasks.length === 0}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors disabled:opacity-50"
+            >
+              <Download className="w-4 h-4" />
+              Export CSV
+            </button>
+            <button
+              id="add-task-btn"
+              onClick={() => setIsModalOpen(true)}
+              className="btn-primary flex items-center gap-2 px-5 py-2.5 text-sm shadow-lg shadow-blue-600/20 hover:shadow-blue-600/30"
+            >
+              <Plus className="w-4 h-4" />
+              Add Task
+            </button>
+          </div>
         </div>
       </div>
 

@@ -42,6 +42,31 @@ function generateJobId() {
   return crypto.randomUUID();
 }
 
+// Allowed attachment MIME types for Document Vault upload
+const ALLOWED_ATTACHMENT_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/webp',
+  'text/plain',
+  'text/csv',
+]);
+
+function isAllowedAttachment(attachment) {
+  if (!attachment || !attachment.filename) return false;
+  // Skip inline images (CID attachments like email signatures)
+  if (attachment.contentDisposition === 'inline' && attachment.contentId) return false;
+  if (attachment.size && attachment.size > 25 * 1024 * 1024) return false; // Skip > 25MB
+  return ALLOWED_ATTACHMENT_TYPES.has(attachment.contentType);
+}
+
 // ─── 1. Save Credentials ──────────────────────────────────
 
 router.post('/save-credentials', async (req, res) => {
@@ -201,10 +226,10 @@ async function processEmailSync(jobId, staffId, staff, days) {
 
           // Use AI to determine if there are actionable college/educational tasks
           const prompt = `
-            Analyze the following email and extract any actionable tasks assigned to the recipient.
+            Carefully analyze the following email and extract the MAIN actionable task assigned to the recipient.
             
             CRITICAL RULES:
-            1. ONLY extract tasks if the email is STRICTLY related to one of these areas:
+            1. ONLY extract a task if the email is STRICTLY related to one of these areas:
                - College / University official work
                - Academic duties (syllabus, teaching, lectures, timetable)
                - Examinations (paper setting, invigilation, result processing)
@@ -227,23 +252,32 @@ async function processEmailSync(jobId, staffId, staff, days) {
                - Generic automated notifications
                - Spam or irrelevant content
             
-            3. Only create tasks for ACTIONABLE items — things the recipient needs to DO. 
+            3. CREATE MAXIMUM 1 OR 2 TASKS. Do not create a task for every sentence. Determine the single overarching actionable goal of this email. Use the Email Subject heavily to determine what the main task should be.
+            
+            4. Only create tasks for ACTIONABLE items — things the recipient needs to DO. 
                Do NOT create tasks for FYI-only information.
+
+            5. DEADLINE EXTRACTION: If the email mentions any deadline, due date, or submission date
+               (e.g., "submit by 25th September", "before next Friday", "deadline: 30/09/2026"),
+               extract it and return it as a date string in YYYY-MM-DD format in the "deadline" field.
+               If no deadline is mentioned, set "deadline" to null.
+               Today's date is: ${new Date().toISOString().split('T')[0]}
 
             Email Subject: ${subject}
             From: ${from}
             Body: ${truncatedContent}
 
-            Return a JSON array of tasks. If there are no actionable college tasks, return [].
+            Return a JSON array of tasks (maximum length 2). If there are no actionable college tasks, return [].
             Schema for each task:
             {
-              "title": "Short descriptive title of the task",
-              "description": "Detailed description including what needs to be done, any deadlines mentioned, and relevant context",
-              "priority": "Medium" | "High" | "Urgent" | "Low"
+              "title": "Short descriptive title of the task based primarily on the email subject",
+              "description": "Detailed description including what needs to be done, any deadlines mentioned, and relevant context from the body",
+              "priority": "Medium" | "High" | "Urgent" | "Low",
+              "deadline": "YYYY-MM-DD" | null
             }
           `;
 
-          const systemInstruction = "You are a strict academic task extraction assistant for college faculty. You ONLY extract actionable tasks from official college/educational emails. You return valid JSON arrays. For non-academic emails, always return [].";
+          const systemInstruction = "You are a strict academic task extraction assistant for college faculty. You carefully analyze emails to find the single most important actionable task. You extract at most 1 or 2 tasks total, prioritizing the email subject. You also extract deadlines when mentioned. For non-academic or FYI emails, always return []. You return valid JSON arrays.";
           const responseSchema = {
             type: "array",
             items: {
@@ -251,7 +285,8 @@ async function processEmailSync(jobId, staffId, staff, days) {
               properties: {
                 title: { type: "string" },
                 description: { type: "string" },
-                priority: { type: "string", enum: ["Low", "Medium", "High", "Urgent"] }
+                priority: { type: "string", enum: ["Low", "Medium", "High", "Urgent"] },
+                deadline: { type: "string", nullable: true }
               },
               required: ["title", "description", "priority"]
             }
@@ -286,22 +321,81 @@ async function processEmailSync(jobId, staffId, staff, days) {
                 continue;
               }
 
+              // Build task row with optional deadline
+              const taskRow = {
+                title: task.title,
+                description: (task.description || '') + `\n\n📧 ${emailTag}`,
+                priority: task.priority || 'Medium',
+                assigned_to: staffId,
+                status: 'Not Started',
+                date_assigned: new Date().toISOString().split('T')[0]
+              };
+
+              // Add deadline if AI extracted one
+              if (task.deadline && /^\d{4}-\d{2}-\d{2}$/.test(task.deadline)) {
+                taskRow.deadline = task.deadline;
+                console.log(`[Gmail Sync] Job ${jobId}: Extracted deadline ${task.deadline} for "${task.title}"`);
+              }
+
               const { error: insertError } = await supabase
                 .from('tasks')
-                .insert({
-                  title: task.title,
-                  description: (task.description || '') + `\n\n📧 ${emailTag}`,
-                  priority: task.priority || 'Medium',
-                  assigned_to: staffId,
-                  status: 'Not Started',
-                  date_assigned: new Date().toISOString().split('T')[0]
-                });
+                .insert(taskRow);
 
               if (insertError) {
                 console.error(`[Gmail Sync] Job ${jobId}: Error inserting task:`, insertError);
               } else {
                 job.tasksCreated.push(task.title);
               }
+            }
+          }
+
+          // ─── Upload attachments to Document Vault ─────────────
+          const attachments = parsed.attachments || [];
+          const validAttachments = attachments.filter(isAllowedAttachment);
+
+          for (const attachment of validAttachments) {
+            try {
+              const safeFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 6)}_${attachment.filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+              const storagePath = `email-attachments/${staffId}/${safeFileName}`;
+
+              // Upload to Supabase Storage
+              const { error: uploadErr } = await supabase.storage
+                .from('document-vault')
+                .upload(storagePath, attachment.content, {
+                  contentType: attachment.contentType,
+                  cacheControl: '3600',
+                  upsert: false,
+                });
+
+              if (uploadErr) {
+                console.error(`[Gmail Sync] Job ${jobId}: Failed to upload attachment "${attachment.filename}":`, uploadErr.message);
+                continue;
+              }
+
+              // Get public URL
+              const { data: urlData } = supabase.storage
+                .from('document-vault')
+                .getPublicUrl(storagePath);
+
+              // Insert into documents table
+              const { error: docErr } = await supabase
+                .from('documents')
+                .insert({
+                  title: `📎 ${attachment.filename} (from: ${subject})`,
+                  description: `Auto-imported from email: "${subject}" sent by ${from}`,
+                  file_url: urlData?.publicUrl || '',
+                  file_name: attachment.filename,
+                  uploaded_by: staffId,
+                  target_scope: 'specific',
+                });
+
+              if (docErr) {
+                console.error(`[Gmail Sync] Job ${jobId}: Failed to insert document row for "${attachment.filename}":`, docErr.message);
+              } else {
+                console.log(`[Gmail Sync] Job ${jobId}: Uploaded attachment "${attachment.filename}" to vault.`);
+              }
+            } catch (attErr) {
+              console.error(`[Gmail Sync] Job ${jobId}: Attachment processing error:`, attErr.message);
             }
           }
 
@@ -333,4 +427,61 @@ async function processEmailSync(jobId, staffId, staff, days) {
   }
 }
 
+// ─── Sync All Users (for cron) ────────────────────────────
+
+async function syncAllUsers() {
+  console.log('[Gmail Auto-Sync] Starting hourly sync for all configured users...');
+  try {
+    const { data: staffList, error } = await supabase
+      .from('staff')
+      .select('id, gmail_address, gmail_app_password')
+      .not('gmail_address', 'is', null)
+      .not('gmail_app_password', 'is', null);
+
+    if (error) {
+      console.error('[Gmail Auto-Sync] Failed to fetch staff list:', error.message);
+      return;
+    }
+
+    if (!staffList || staffList.length === 0) {
+      console.log('[Gmail Auto-Sync] No users with Gmail credentials configured. Skipping.');
+      return;
+    }
+
+    console.log(`[Gmail Auto-Sync] Found ${staffList.length} user(s) to sync.`);
+
+    for (const staff of staffList) {
+      const jobId = generateJobId();
+      syncJobs.set(jobId, {
+        status: 'running',
+        staffId: staff.id,
+        tasksCreated: [],
+        totalProcessed: 0,
+        totalEmails: 0,
+        error: null,
+        startedAt: Date.now(),
+        completedAt: null
+      });
+
+      try {
+        await processEmailSync(jobId, staff.id, staff);
+        console.log(`[Gmail Auto-Sync] Completed sync for ${staff.gmail_address}. Tasks created: ${syncJobs.get(jobId)?.tasksCreated.length || 0}`);
+      } catch (err) {
+        console.error(`[Gmail Auto-Sync] Failed sync for ${staff.gmail_address}:`, err.message);
+        const job = syncJobs.get(jobId);
+        if (job) {
+          job.status = 'failed';
+          job.error = err.message;
+          job.completedAt = Date.now();
+        }
+      }
+    }
+
+    console.log('[Gmail Auto-Sync] Hourly sync completed for all users.');
+  } catch (err) {
+    console.error('[Gmail Auto-Sync] Critical error:', err.message);
+  }
+}
+
+export { syncAllUsers };
 export default router;

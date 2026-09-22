@@ -68,7 +68,10 @@ const TaskCard = ({ task, onDelete, onStatusChange, categoryColor }) => {
 
         {/* Title */}
         <div className="flex items-center gap-2 mb-2">
-          <h3 className="text-base font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">
+          <h3 className={clsx(
+            "text-base font-bold leading-snug line-clamp-2",
+            task.status === 'Done' ? "line-through text-emerald-600 dark:text-emerald-500" : "text-slate-900 dark:text-white"
+          )}>
             {task.title}
           </h3>
           {task.created_by && task.created_by !== task.assigned_to && (
@@ -146,13 +149,21 @@ const TaskCard = ({ task, onDelete, onStatusChange, categoryColor }) => {
 
         {/* Expand / actions row */}
         <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-          >
-            {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            {expanded ? 'Less' : 'Details'}
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+            >
+              {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              {expanded ? 'Less' : 'Preview'}
+            </button>
+            <a
+              href={`/tasks/${task.id}`}
+              className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+            >
+              View Full Details <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
 
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             {/* Status quick-toggle */}

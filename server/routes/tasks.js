@@ -104,6 +104,16 @@ router.post('/', async (req, res) => {
     await supabase.from('task_coordinators').insert(rows);
   }
 
+  // Create notification if assigned by someone else (e.g., HOD)
+  if (taskData.assigned_to && taskData.created_by && taskData.assigned_to !== taskData.created_by) {
+    await supabase.from('notifications').insert([{
+      user_id: taskData.assigned_to,
+      title: 'New Task Assigned',
+      message: `You have been assigned a new task: "${taskData.title}"`,
+      type: 'task'
+    }]);
+  }
+
   res.status(201).json(task);
 });
 

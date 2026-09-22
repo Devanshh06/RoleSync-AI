@@ -27,7 +27,7 @@ const SearchPage = () => {
     // Enrich with types for display
     const enriched = data.map((d, i) => ({
       ...d,
-      type: i === 0 ? 'document' : 'document',
+      type: 'task',
     }));
     setResults(enriched);
     setLoading(false);
@@ -144,9 +144,9 @@ const SearchPage = () => {
                   "{result.snippet}"
                 </p>
                 <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
-                  <button className="text-blue-600 hover:text-blue-700 font-medium text-sm flex items-center gap-1 hover:gap-2 transition-all">
-                    View full document <ExternalLink className="w-3 h-3" />
-                  </button>
+                  <a href={`/tasks/${result.id}`} className="text-blue-600 hover:text-blue-700 font-medium text-sm flex items-center gap-1 hover:gap-2 transition-all">
+                    View full details <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
               </Card>
             );

@@ -74,23 +74,48 @@ router.post('/chat', async (req, res) => {
   }
 
   try {
-    // Fetch recent tasks for context
+    // Fetch user profile
+    const { data: userProfile } = await supabase
+      .from('staff')
+      .select('full_name, department, designation')
+      .eq('id', staffId)
+      .single();
+
+    // Fetch recent tasks for context (expanded to 30)
     const { data: tasks } = await supabase
       .from('tasks')
-      .select('title, status, priority, deadline')
+      .select('title, status, priority, deadline, description')
       .eq('assigned_to', staffId)
       .order('created_at', { ascending: false })
-      .limit(10);
+      .limit(30);
 
-    const tasksContext = tasks ? tasks.map(t => `- [${t.status}] ${t.title} (Priority: ${t.priority}, Deadline: ${t.deadline || 'None'})`).join('\n') : 'No recent tasks.';
+    const tasksContext = tasks && tasks.length > 0 
+      ? tasks.map(t => `- [${t.status}] ${t.title} (Priority: ${t.priority}, Due: ${t.deadline || 'None'}): ${t.description?.substring(0, 50) || ''}`).join('\n') 
+      : 'No recent tasks.';
+
+    // Fetch recent documents shared with this user or all
+    const { data: docs } = await supabase
+      .from('documents')
+      .select('title, description, created_at')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    const docsContext = docs && docs.length > 0
+      ? docs.map(d => `- ${d.title}: ${d.description || 'No description'}`).join('\n')
+      : 'No recent documents.';
 
     const systemInstruction = `
       You are RoleSync-AI, a helpful assistant for faculty members.
-      You have access to the user's recent tasks as context.
-      Answer the user's questions concisely and helpfully based on this context.
+      You are currently talking to: ${userProfile?.full_name || 'Faculty Member'} (${userProfile?.designation || 'Staff'} in ${userProfile?.department || 'Department'}).
       
+      You have access to the user's workload and recent documents.
+      Answer the user's questions concisely and helpfully based on this context.
+
       User's Recent Tasks:
       ${tasksContext}
+
+      Recently Uploaded Documents (Vault):
+      ${docsContext}
     `;
 
     const prompt = message;
